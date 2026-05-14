@@ -85,26 +85,41 @@ the hosted Checkout page does the redirect for us.
 
 ## Step 2 — Add environment variables
 
-Create a file `.env.local` at the repo root:
+Create a file `.env` (or `.env.local` — Next reads both, and `.gitignore` in
+this repo covers `.env*` so neither is committed) at the repo root:
 
 ```bash
-# .env.local  (DO NOT COMMIT — this file is already gitignored by Next.js)
+# DO NOT COMMIT — gitignored via the .env* rule
 STRIPE_SECRET_KEY=sk_test_replace_me
 STRIPE_PUBLISHABLE_KEY=pk_test_replace_me
 
 # Used by the Stripe SDK to build redirect URLs. Change for production.
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
-# Step 9 only. Leave blank for now.
+# Step 10 only. Leave blank for now.
 STRIPE_WEBHOOK_SECRET=
 ```
+
+> **🛑 Sanity-check your keys BEFORE saving the file.** The two values look
+> almost identical and are very easy to swap by accident. The first two
+> characters tell you which is which:
+>
+> | Prefix | Type | Where it goes |
+> |--------|------|---------------|
+> | `sk_test_…` / `sk_live_…` | **S**ecret key — can charge cards. Server-only. | `STRIPE_SECRET_KEY` |
+> | `pk_test_…` / `pk_live_…` | **P**ublishable key — identifies your account. Safe in the browser. | `STRIPE_PUBLISHABLE_KEY` |
+>
+> If you put a `pk_…` value into `STRIPE_SECRET_KEY`, every Stripe API call
+> will fail with an authentication error and your Checkout button will look
+> broken. (This is the single most common bug — I hit it during my own
+> testing run of this walkthrough.)
 
 Notes for students:
 - `NEXT_PUBLIC_*` variables are exposed to the browser. Everything else is
   server-only.
-- Restart `npm run dev` after editing `.env.local` — Next picks up env files at
-  startup.
-- Confirm `.env.local` is gitignored (`git status` should not list it).
+- **Restart `npm run dev` after editing the env file** — Next picks up env
+  files at startup, not on save.
+- Confirm the file is gitignored (`git status` should not list it).
 
 ---
 
@@ -606,6 +621,10 @@ When you eventually deploy this (Vercel, Fly, etc.):
 
 ## Common pitfalls (FAQ)
 
+**"Invalid API Key provided" / Stripe authentication errors.**
+You swapped the keys — `STRIPE_SECRET_KEY` is holding a `pk_…` value. Re-read
+Step 2's prefix table and swap them back. Restart `npm run dev` afterwards.
+
 **"Stripe says no such price."**
 You sent `price_data` with `unit_amount: 0`. Check the product price in the
 DB.
@@ -614,14 +633,33 @@ DB.
 Either the `STRIPE_WEBHOOK_SECRET` is wrong, or you didn't read the raw body
 with `request.text()` (parsing as JSON breaks the signature).
 
-**"My cart is empty after I refresh the page."**
-Correct — the Redux store lives in memory and is recreated per page load.
-That's deliberate for this lesson. A real app would persist it to
-`localStorage` or a backend.
+**"My cart is empty after I click Add to cart and then refresh / type the URL."**
+Correct — the Redux store lives in memory and is recreated per *page load*.
+Client-side navigation via `<Link>` preserves it; `window.location = '/cart'`
+or typing the URL does not. That's deliberate for this lesson. A real app
+would persist the cart to `localStorage` or a backend. (We hit this exact
+gotcha during testing: a programmatic hard-navigation wiped the cart between
+adding items and viewing them. Lesson: when state lives in Redux, prefer
+`<Link>` over `window.location`.)
+
+**"The Add to cart button does nothing visible."**
+Open Redux DevTools and watch actions flow when you click. If `cart/itemAdded`
+fires but the chip in the header doesn't update, something is wrong with the
+`useAppSelector` subscription (most likely two `StoreProvider`s in the tree —
+there should only be one, in `app/layout.tsx`).
+
+**"Port 3000 already in use."**
+You have another dev server running. Either kill it, or start this one on a
+different port with `PORT=3001 npm run dev`. If you change the port, update
+`NEXT_PUBLIC_SITE_URL` to match, otherwise Stripe will redirect you back to
+the wrong app after payment.
 
 **"The success page doesn't show anything."**
 Check the URL. If `session_id` is missing, the `success_url` in step 7 is
 malformed.
+
+**"My env changes don't seem to take effect."**
+Next reads env files at server startup. Restart `npm run dev`.
 
 ---
 

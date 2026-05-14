@@ -1,5 +1,6 @@
 "use client";
 
+import { itemAdded } from "@/lib/features/cart/cartslice";
 import {
   fetchProducts,
   productSelected,
@@ -43,6 +44,7 @@ export default function ProductsReduxPage() {
                 product={product}
                 selected={product.id === selectedId}
                 onSelect={() => dispatch(productSelected(product.id))}
+                onAddToCart={() => dispatch(itemAdded(product.id))}
               />
             ))}
           </ul>
@@ -56,10 +58,12 @@ function ProductCard({
   product,
   selected,
   onSelect,
+  onAddToCart,
 }: {
   product: Product;
   selected: boolean;
   onSelect: () => void;
+  onAddToCart: () => void;
 }) {
   return (
     <li
@@ -105,6 +109,15 @@ function ProductCard({
         <p className="mt-3 text-xs text-zinc-500">
           Stock: {product.stock_quantity} · {product.supplier}
         </p>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddToCart();
+          }}
+          className="mt-3 w-full rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
+        >
+          Add to cart
+        </button>
       </div>
     </li>
   );
